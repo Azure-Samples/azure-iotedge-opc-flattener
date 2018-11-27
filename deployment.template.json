@@ -157,7 +157,7 @@
         "schemaVersion": "1.0",
         "routes": {
           "OPCFlattenerModuleToIoTHub": "FROM /messages/modules/flattener/outputs/* INTO $upstream",
-          "sensorToOPCFlattenerModule": "FROM /messages/modules/publisher/outputs/* INTO BrokeredEndpoint(\"/modules/flattener/inputs/input1\")"
+          "sensorToOPCFlattenerModule": "FROM /messages/modules/publisher INTO BrokeredEndpoint(\"/modules/flattener/inputs/input1\")"
         },
         "storeAndForwardConfiguration": {
           "timeToLiveSecs": 7200
