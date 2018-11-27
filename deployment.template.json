@@ -1,0 +1,168 @@
+{
+  "$schema-template": "1.0.0",
+  "modulesContent": {
+    "$edgeAgent": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "runtime": {
+          "type": "docker",
+          "settings": {
+            "minDockerVersion": "v1.25",
+            "loggingOptions": "",
+            "registryCredentials": {}
+          }
+        },
+        "systemModules": {
+          "edgeAgent": {
+            "type": "docker",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+              "createOptions": {}
+            }
+          },
+          "edgeHub": {
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+              "createOptions": {
+                "HostConfig": {
+                  "PortBindings": {
+                    "5671/tcp": [
+                      {
+                        "HostPort": "5671"
+                      }
+                    ],
+                    "8883/tcp": [
+                      {
+                        "HostPort": "8883"
+                      }
+                    ],
+                    "443/tcp": [
+                      {
+                        "HostPort": "443"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "modules": {
+          "opcplc": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/iotedge/opc-plc:latest",
+              "createOptions": {
+                "Hostname" : "opcplc",
+                "Cmd" : [ "--aa" ],
+                "HostConfig": {
+                  "ExposedPorts" : {
+                    "50000/tcp": {}
+                  },
+                  "PortBindings": {
+                    "50000/tcp": [
+                      {
+                        "HostPort": "50000"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "publisher": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/iotedge/opc-publisher:2.2.0",
+              "createOptions": {
+                "Hostname" : "publisher",
+                "Cmd" : [ 
+                  "publisher",
+                  "--at",
+                  "directory",
+                  "--ap",
+                  "/d/config/own",
+                  "--pf",
+                  "/d/appdata/publishednodes.json",
+                  "--tc",
+                  "/d/appdata/telemetryconfig.json",
+                  "--di=60",
+                  "--tp",
+                  "/d/config/trusted",
+                  "--rp",
+                  "/d/config/rejected",
+                  "--ip",
+                  "/d/config/issuer",
+                  "--si=1",
+                  "--to",
+                  "--aa"
+                 ],
+                "HostConfig": {
+                  "ExposedPorts" : {
+                    "62222/tcp": {}
+                  },
+                  "PortBindings": {
+                    "62222/tcp": [
+                      {
+                        "HostPort": "62222"
+                      }
+                    ]
+                  },
+                  "Binds": [
+                    "C:/Dev/opc/iotedgeopcflattener:/d"
+                  ]
+                }
+              }
+            }
+          },
+          "flattener": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.OPCFlattenerModule}",
+              "createOptions": {
+                "Hostname" : "flattener",
+                "Cmd" : [ 
+                  "--verbose",
+                  "true",
+                  "--template",
+                  "/d/appdata/template.json",
+                  "--mapping",
+                  "/d/appdata/flatteningconfig.json"
+                ],
+                "HostConfig": {
+                  "Binds": [
+                    "C:/Dev/opc/iotedgeopcflattener:/d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "$edgeHub": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "routes": {
+          "OPCFlattenerModuleToIoTHub": "FROM /messages/modules/flattener/outputs/* INTO $upstream",
+          "sensorToOPCFlattenerModule": "FROM /messages/modules/publisher/outputs/* INTO BrokeredEndpoint(\"/modules/flattener/inputs/input1\")"
+        },
+        "storeAndForwardConfiguration": {
+          "timeToLiveSecs": 7200
+        }
+      }
+    }
+  }
+}
