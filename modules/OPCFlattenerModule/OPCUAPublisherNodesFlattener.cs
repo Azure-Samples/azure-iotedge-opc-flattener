@@ -1,8 +1,9 @@
-using Microsoft.Azure.Devices.Client;
+﻿using Microsoft.Azure.Devices.Client;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -24,6 +25,8 @@ namespace OPCUAPubFlattener
 
         public const string VALUEPROPERTYNAME = "Value";
         public bool DoAddTimeCreatedProperty { get; set; } = true;
+
+        public bool DoUseApplicationUri { get; set; } = true;
 
         public bool Verbose { get; set; } = false;
 
@@ -59,25 +62,52 @@ namespace OPCUAPubFlattener
 
         public string DoFlatten(string jsonmessage)
         {
-            JObject result = this.OutputTemplate != null ? (JObject)this.OutputTemplate.DeepClone() : new JObject();
+            string resultString = "{}";
 
-            JArray opcNodes = JArray.Parse(jsonmessage);
+            if (jsonmessage != null && jsonmessage.Length > 2)
+            {
+                if (jsonmessage.StartsWith('['))
+                    resultString = this.DoStandardFlattening(JArray.Parse(jsonmessage));
+                else if (jsonmessage.StartsWith('{'))
+                {
+                    JArray opcNodes = new JArray();
+                    opcNodes.Add(JObject.Parse(jsonmessage));
+                    resultString = this.DoStandardFlattening(opcNodes);
+                }
+            }
+
+            return resultString;
+        }
+
+        protected string DoStandardFlattening(JArray opcNodes)
+        {
+            Dictionary<ApplicationNodeId, List<KeyValuePair<DateTime, JObject>>> nodes = this.CreateNodeTimeseries(opcNodes);
+
+            JObject result = this.OutputTemplate != null ? (JObject)this.OutputTemplate.DeepClone() : new JObject();
             DateTime latest = DateTime.MinValue;
 
-            foreach (var anode in opcNodes)
+            foreach (var nodeEntry in nodes)
             {
-                string displayname = anode[this.DisplayNamePropertyname] != null ? anode[this.DisplayNamePropertyname].ToString() : null;
-                if ((this.DisplayNames != null && this.DisplayNames.ContainsKey(anode[this.NodeIdPropertyname].ToString())) 
-                    || (displayname == null || displayname.Length == 0))
+                List<KeyValuePair<DateTime, JObject>> nodeTSEntries = nodeEntry.Value;
+
+                if (nodeTSEntries.Count > 0)
                 {
-                    displayname = this.DisplayNames[anode[this.NodeIdPropertyname].ToString()];
+                    JObject anode = nodeTSEntries[nodeTSEntries.Count - 1].Value;
+
+                    string displayname = (this.DoUseApplicationUri ? anode["ApplicationUri"].ToString() : "") + ";" +
+                        (anode[this.DisplayNamePropertyname] != null ? anode[this.DisplayNamePropertyname].ToString() : null);
+                    if ((this.DisplayNames != null && this.DisplayNames.ContainsKey(anode[this.NodeIdPropertyname].ToString()))
+                        || (displayname == null || displayname.Length == 0))
+                    {
+                        displayname = this.DisplayNames[anode[this.NodeIdPropertyname].ToString()];
+                    }
+
+                    result.Add(new JProperty(displayname, anode[VALUEPROPERTYNAME][VALUEPROPERTYNAME]));
+
+                    DateTime aDate = nodeTSEntries[nodeTSEntries.Count - 1].Key;
+                    if (aDate > latest)
+                        latest = aDate;
                 }
-
-                result.Add(new JProperty(displayname, anode[VALUEPROPERTYNAME][VALUEPROPERTYNAME]));
-                DateTime aDate = DateTime.Parse((anode[VALUEPROPERTYNAME]["SourceTimestamp"]).ToString());
-                if (aDate > latest)
-                    latest = aDate;
-
             }
 
             if (this.DoAddTimeCreatedProperty)
@@ -89,6 +119,33 @@ namespace OPCUAPubFlattener
                 Console.WriteLine($"Flattened message: Body: [{resultString}]");
 
             return resultString;
+        }
+
+        private Dictionary<ApplicationNodeId, List<KeyValuePair<DateTime, JObject>>> CreateNodeTimeseries(JArray opcNodes)
+        {
+            Dictionary<ApplicationNodeId, List<KeyValuePair<DateTime, JObject>>> result = new Dictionary<ApplicationNodeId, List<KeyValuePair<DateTime, JObject>>>(new ApplicationNodeIdComparer());
+
+            foreach (var anode in opcNodes)
+            {
+                ApplicationNodeId applicationNodeId = new ApplicationNodeId(anode["ApplicationUri"].ToString(), anode[this.NodeIdPropertyname].ToString());
+                DateTime aDate = anode[VALUEPROPERTYNAME]["SourceTimestamp"].Value<DateTime>();
+                if (result.ContainsKey(applicationNodeId))
+                {
+                    List<KeyValuePair<DateTime, JObject>> entry = result[applicationNodeId];
+                    entry.Add(new KeyValuePair<DateTime, JObject>(aDate, (JObject)anode));
+                    entry.Sort(delegate(KeyValuePair<DateTime, JObject> first, KeyValuePair<DateTime, JObject> second) {
+                        if (first.Key == null && second.Key == null) return 0;
+                        else if (first.Key == null) return -1;
+                        else if (second.Key == null) return 1;
+                        else return first.Key.CompareTo(second.Key);
+                    });
+                } else
+                {
+                    result.Add(applicationNodeId, new List<KeyValuePair<DateTime, JObject>> () { new KeyValuePair<DateTime, JObject>(aDate, (JObject)anode) });
+                }
+            }
+
+            return result;
         }
 
         public void UseOutputTemplateFromFile(string jsonfile)
@@ -153,5 +210,36 @@ namespace OPCUAPubFlattener
 
             return false;
         }
+    }
+
+    public class ApplicationNodeId
+    {
+        public string ApplicationUri { get; set; }
+
+        public string NodeId { get; set; }
+
+        public ApplicationNodeId(string appUri, string nodeId)
+        {
+            this.ApplicationUri = appUri;
+            this.NodeId = nodeId;
+        }
+    }
+
+    public class ApplicationNodeIdComparer : IEqualityComparer<ApplicationNodeId>
+    {
+        #region IEqualityComparer<ApplicationNodeId> Members
+
+        public bool Equals(ApplicationNodeId x, ApplicationNodeId y)
+        {
+            return ((x.ApplicationUri == y.ApplicationUri) & (x.NodeId == y.NodeId));
+        }
+
+        public int GetHashCode(ApplicationNodeId obj)
+        {
+            string combined = obj.ApplicationUri + "|" + obj.NodeId;
+            return (combined.GetHashCode());
+        }
+
+        #endregion
     }
 }

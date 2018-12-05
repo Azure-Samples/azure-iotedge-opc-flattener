@@ -1,40 +1,14 @@
 {
-    "NodesMapping": [
-      {
-        "nsu=http://opcfoundation.org/UA/;i=2258": {
-          "DisplayName": "Currenttime"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=SpikeData": {
-          "DisplayName": "SpikeData"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=DipData": {
-          "DisplayName": "DipData"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=AlternatingBoolean": {
-          "DisplayName": "AlternatingBoolean"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=RandomUnsignedInt32": {
-          "DisplayName": "RandomUnsignedInt32"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=PositiveTrendData": {
-          "DisplayName": "PositiveTrendData"
-        }
-      },
-      {
-        "nsu=http://microsoft.com/Opc/OpcPlc/;s=NegativeTrendData": {
-          "DisplayName": "NegativeTrendData"
-        }
+  "NodesMapping": [
+    {
+      "nsu=http://opcfoundation.org/UA/;i=2258": {
+        "DisplayName": "Current_time"
       }
-    ]
-  }
-  
+    },
+    {
+      "nsu=http://microsoft.com/Opc/OpcPlc/;s=DipData": {
+        "DisplayName": "DipData"
+      }
+    }
+  ]
+}
