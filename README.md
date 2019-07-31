@@ -1,3 +1,12 @@
+---
+page_type: sample
+languages:
+- csharp
+products:
+- azure
+- azure-iot-edge
+description: "Simple sample showing how to use to do a protocol translation in an Azure IoT Edge module. The output of the OPC UA Publisher module will be flattened, transformed and enriched."
+---
 # Azure IoT Edge Protocol translation sample
 
 Simple sample showing how to use to do a protocol translation in an [Azure IoT Edge](https://azure.microsoft.com/en-us/services/iot-edge/) module. The output of the [OPC-UA Publisher](https://github.com/Azure/iot-edge-opc-publisher) module will be flattened, transformed and enriched by the OPCFlattenerModule.
